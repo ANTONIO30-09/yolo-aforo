@@ -19,16 +19,19 @@ El pipeline esta dividido en 3 fases independientes y validadas:
    promedio y pico por bloque horario) y genera un grafico comparativo.
 
 ## Estructura de archivos
+
+```
 yolo_aforo/
-├── config.py # Configuracion centralizada (parametros ajustables)
-├── detector.py # Wrapper de YOLO para deteccion de objetos
-├── data_logger.py # Escritura del dataset crudo a CSV
-├── main.py # Fase 1: captura + deteccion + logging
-├── transformer.py # Fase 2: logica de limpieza y enriquecimiento
-├── transform.py # Fase 2: script orquestador
-├── build_notebook.py # Genera el notebook de la Fase 3
-├── analisis_fase3.ipynb # Fase 3: notebook de analisis y metricas
-└── requirements.txt
++-- config.py             # Configuracion centralizada (parametros ajustables)
++-- detector.py           # Wrapper de YOLO para deteccion de objetos
++-- data_logger.py        # Escritura del dataset crudo a CSV
++-- main.py               # Fase 1: captura + deteccion + logging
++-- transformer.py        # Fase 2: logica de limpieza y enriquecimiento
++-- transform.py          # Fase 2: script orquestador
++-- build_notebook.py     # Genera el notebook de la Fase 3
++-- analisis_fase3.ipynb  # Fase 3: notebook de analisis y metricas
+`-- requirements.txt
+```
 
 ## Instalacion
 
