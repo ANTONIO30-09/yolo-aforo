@@ -1,30 +1,22 @@
 """
 transform.py
 ------------
-Punto de entrada de la Fase 2: Ingenieria y Transformacion de Datos.
-
-Lee el dataset crudo, aplica limpieza y enriquecimiento, y genera
-un nuevo archivo dataset_limpio.csv (el crudo queda intacto).
-
-Ejecucion:
-    python transform.py
+Script de ejecución para la Fase 2.
+Llama a las funciones del nuevo transformer.py que lee los archivos diarios.
 """
-
-import config
 from transformer import transform, save_clean_data
-
+import config
 
 def run() -> None:
-    print(f"[INFO] Leyendo dataset crudo: {config.RAW_DATASET_PATH}")
-    df_clean = transform()
-
-    print(f"[INFO] Registros tras filtrado (solo 'persona'): {len(df_clean)}")
-    print("[INFO] Distribucion por bloque horario:")
-    print(df_clean["bloque_horario"].value_counts().to_string())
-
-    save_clean_data(df_clean)
-    print(f"[INFO] Dataset limpio guardado en: {config.CLEAN_DATASET_PATH.resolve()}")
-
+    print("[INFO] Iniciando Fase 2: Transformación de datos...")
+    
+    # Ejecuta la transformación (lee todos los dataset_crudo_*.csv)
+    df_limpio = transform()
+    
+    # Guarda el resultado en dataset_limpio.csv
+    save_clean_data(df_limpio, config.CLEAN_DATASET_PATH)
+    
+    print(f"[INFO] Transformación completada. Total de registros limpios: {len(df_limpio)}")
 
 if __name__ == "__main__":
     run()
