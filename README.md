@@ -1,92 +1,79 @@
-# YOLO Aforo
+# YOLO Aforo: Sistema de Monitoreo de Aforo en Tiempo Real
 
-Sistema de monitoreo de aforo en tiempo real con YOLOv8 y OpenCV: detecta
-personas por webcam, transforma los datos por jornada horaria y genera
-metricas para optimizar la asignacion de personal en recintos comerciales
-(restaurantes, cines, bancos, supermercados).
+Pipeline de minería de datos que detecta personas por webcam usando **YOLOv8**, registra los datos por día, los limpia con un **reporte de calidad** y genera un **dashboard unificado** para analizar la afluencia.
 
-## Arquitectura del proyecto
+## Arquitectura del Proyecto
 
-El pipeline esta dividido en 3 fases independientes y validadas:
+El backend está dividido en módulos independientes para garantizar escalabilidad y mantenibilidad:
 
-1. **Colecta e Ingesta** (`main.py`): captura video de la webcam, detecta
-   objetos con YOLOv8n y registra cada deteccion (fecha, hora, clase) en
-   `data/dataset_crudo.csv`.
-2. **Transformacion** (`transform.py`): filtra el dataset conservando solo
-   la clase `persona`, y enriquece con `dia` de la semana y `bloque_horario`
-   (Matinal / Vespertina). Genera `data/dataset_limpio.csv`.
-3. **Analisis** (`analisis_fase3.ipynb`): calcula metricas (conteo total,
-   promedio y pico por bloque horario) y genera un grafico comparativo.
+1. Colecta e Ingesta (main.py + detector.py + data_logger.py)
+   - Detecta objetos con YOLOv8n (traducidos al español).
+   - Guarda solo personas en un archivo CSV distinto por cada día (ej. dataset_crudo_Jueves_2026-11-12.csv).
+   - Registra la hora exacta en formato HH:MM (sin segundos).
 
-## Estructura de archivos
+2. Transformación y Limpieza (transformer.py + transform.py)
+   - Lee todos los archivos diarios y los unifica.
+   - Filtra falsos positivos (perros, celulares, etc.).
+   - Elimina duplicados (misma persona detectada varias veces en el mismo minuto).
+   - Genera un reporte de calidad (nulos, no-persona, duplicados eliminados).
+   - Enriquece con día de la semana y bloque_horario (Mañana / Vespertina).
 
-```
-yolo_aforo/
-+-- config.py             # Configuracion centralizada (parametros ajustables)
-+-- detector.py           # Wrapper de YOLO para deteccion de objetos
-+-- data_logger.py        # Escritura del dataset crudo a CSV
-+-- main.py               # Fase 1: captura + deteccion + logging
-+-- transformer.py        # Fase 2: logica de limpieza y enriquecimiento
-+-- transform.py          # Fase 2: script orquestador
-+-- build_notebook.py     # Genera el notebook de la Fase 3
-+-- analisis_fase3.ipynb  # Fase 3: notebook de analisis y metricas
-`-- requirements.txt
-```
+3. Visualización y Dashboard (dashboard.py + graficar_dias.py + graficar_tendencia.py)
+   - Genera un Dashboard unificado con:
+     * Gráfico de barras (aforo total por día de la semana).
+     * Gráfico de escalones (tendencia acumulada por hora).
+   - Incluye línea de promedio en ambos gráficos.
 
-## Instalacion
+## Estructura del Proyecto y Ejecución
 
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
+El flujo del proyecto se ejecuta así:
 
-La primera ejecucion de main.py descargara automaticamente los pesos yolov8n.pt (~6MB).
+    yolo_aforo/
+    +-- config.py                 # Configuración centralizada (rutas, modelo, traducciones)
+    +-- detector.py               # Wrapper de YOLO + traducción al español + tracking
+    +-- data_logger.py            # Escritura de CSV diarios (particionamiento por fecha)
+    +-- main.py                   # Fase 1: captura + detección + logging
+    +-- transformer.py            # Fase 2: lógica de limpieza + reporte de calidad
+    +-- transform.py              # Fase 2: script orquestador
+    +-- dashboard.py              # Fase 3: genera el dashboard unificado
+    +-- graficar_dias.py          # Fase 3: gráfico de barras por día
+    +-- graficar_tendencia.py     # Fase 3: gráfico de tendencia por minuto
+    +-- Hito4_Proyecto_YOLO_Aforo_COMPLETO.ipynb # Cuaderno de entrega final
+    +-- requirements.txt
+    +-- .gitignore
 
-## Uso
+COMANDOS DE EJECUCIÓN (PASO A PASO):
 
-Fase 1 - Capturar datos desde la webcam:
+1. Crear y activar entorno virtual
+   python3 -m venv venv
+   source venv/bin/activate
 
-    python main.py
+2. Instalar dependencias
+   pip install -r requirements.txt
 
-Presiona 'q' en la ventana de video (o Ctrl+C en terminal) para detener.
-Genera data/dataset_crudo.csv.
+3. Capturar datos desde la webcam (Presiona 'q' para detener)
+   python main.py
 
-Fase 2 - Limpiar y transformar los datos:
+4. Limpiar y transformar los datos
+   python transform.py
 
-    python transform.py
+5. Generar el Dashboard
+   python dashboard.py
 
-Genera data/dataset_limpio.csv (el dataset crudo queda intacto).
+6. Abrir el Cuaderno de Entrega
+   jupyter notebook Hito4_Proyecto_YOLO_Aforo_COMPLETO.ipynb
 
-Fase 3 - Analizar metricas (regenera el notebook si se modifico build_notebook.py):
+## Ejemplos de Datasets
 
-    python build_notebook.py
-    jupyter lab analisis_fase3.ipynb
+Dataset crudo (un archivo por día):
+dia_semana,fecha,hora,clase_objeto
+Jueves,2026-11-12,11:46,persona
 
-Dentro de Jupyter Lab: Run -> Run All Cells.
-
-## Configuracion
-
-Todos los parametros ajustables estan centralizados en config.py:
-
-- VIDEO_SOURCE: indice de la webcam (0, 1, 2...) o ruta a un .mp4
-- CONFIDENCE_THRESHOLD: confianza minima para aceptar una deteccion
-- SAMPLING_INTERVAL_SECONDS: segundos entre cada registro
-- MORNING_RANGE / AFTERNOON_RANGE: rangos horarios de cada jornada
-
-## Dataset crudo (ejemplo)
-
-fecha,hora,clase_objeto
-2026-09-17,20:45:50,person
-2026-09-17,20:46:01,cell phone
-
-## Dataset limpio (ejemplo)
-
+Dataset limpio (dataset_limpio.csv):
 fecha,dia,hora,clase_objeto,bloque_horario
-2026-09-17,Jueves,20:45:50,persona,Vespertina
+2026-11-12,Jueves,11:46,persona,Mañana
 
 ## Notas
-
-- Corre sobre CPU (sin GPU dedicada) usando YOLOv8n, el modelo mas liviano
-  de la familia, pensado para hardware limitado.
-- Los datasets generados (data/) y el modelo descargado (*.pt) no se
-  versionan en este repositorio (ver .gitignore).
-- Proyecto desarrollado para el curso MDA-611 Mineria de Datos.
+- El proyecto corre sobre CPU usando yolov8n.pt (el modelo más liviano de la familia), pensado para hardware limitado.
+- Los datasets generados (data/) y los modelos descargados (*.pt) no se versionan (ver .gitignore).
+- Desarrollado para el curso MDA-611 Minería de Datos.
