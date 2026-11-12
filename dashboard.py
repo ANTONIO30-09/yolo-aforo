@@ -1,80 +1,132 @@
 """
 dashboard.py
 ------------
-Genera un Dashboard unificado con el Aforo Total por Día (Barras)
-y la Tendencia Acumulada por Hora (Escalones).
-Lee el dataset_limpio.csv real del proyecto.
+Dashboard de Aforo - Análisis Integral (2x2).
+Soluciona la superposición de días usando desplazamiento horizontal (Jitter).
 """
 import pandas as pd
 import matplotlib.pyplot as plt
 import config
 
 def generar_dashboard():
-    print("[INFO] Leyendo dataset limpio para el Dashboard...")
+    print("[INFO] Leyendo dataset limpio...")
     df = pd.read_csv(config.CLEAN_DATASET_PATH)
     
     if df.empty:
-        print("[WARN] El dataset está vacío. Ejecuta main.py y transform.py primero.")
+        print("[WARN] El dataset está vacío.")
         return
 
-    # ==========================================
-    # PREPARACIÓN DE DATOS
-    # ==========================================
-    # 1. Totales por Día (Para el gráfico de barras)
-    conteo_dias = df.groupby('dia').size().reset_index(name='total')
+    # Preparar datos generales
     orden_dias = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
-    dias_completos = pd.DataFrame({'dia': orden_dias})
-    conteo_dias = dias_completos.merge(conteo_dias, on='dia', how='left').fillna(0)
-    promedio = conteo_dias['total'].mean()
+    orden_bloques = ['Mañana', 'Tarde', 'Noche']
+    df['hora_hh'] = df['hora'].str.slice(0, 2) + ":00"
+
+    # Configurar el lienzo 2x2
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('Dashboard de Aforo - Análisis Integral', fontsize=18, fontweight='bold')
+    fig.subplots_adjust(hspace=0.5, wspace=0.3)
 
     # ==========================================
-    # CREANDO EL DASHBOARD
+    # GRÁFICO 1 (Arriba Izq): Barras por Día y Bloque
     # ==========================================
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-    fig.suptitle('Dashboard de Aforo - Análisis de Datos', fontsize=16, fontweight='bold')
-
-    # --- GRÁFICO 1: BARRAS POR DÍA ---
-    barras = ax1.bar(conteo_dias['dia'], conteo_dias['total'], color='#4A55A2', alpha=0.8)
-    for barra in barras:
-        altura = barra.get_height()
-        if altura > 0:
-            ax1.text(barra.get_x() + barra.get_width()/2., altura, f'{int(altura)}', 
-                     ha='center', va='bottom', fontweight='bold')
-
-    ax1.axhline(y=promedio, color='red', linestyle='--', label=f'Promedio: {promedio:.1f}')
-    ax1.set_title('Aforo Total por Día de la Semana')
-    ax1.set_ylabel('Total Personas Detectadas')
-    ax1.legend()
-    ax1.grid(axis='y', linestyle='--', alpha=0.7)
-
-    # --- GRÁFICO 2: TENDENCIA ACUMULADA POR HORA ---
-    # Agrupamos por fecha y hora para sacar el acumulado real
-    colores = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink']
+    ax1 = axes[0, 0]
+    pivot_df = df.groupby(['dia', 'bloque_horario']).size().unstack(fill_value=0)
+    for col in orden_bloques:
+        if col not in pivot_df.columns: pivot_df[col] = 0
+    pivot_df = pivot_df[orden_bloques].reindex(orden_dias, fill_value=0)
     
-    for i, fecha in enumerate(df['fecha'].unique()):
-        df_dia = df[df['fecha'] == fecha]
-        # Contamos cuántas personas hay en cada minuto exacto de ese día
-        conteo_hora = df_dia.groupby('hora').size().reset_index(name='cantidad')
-        # Calculamos el acumulado
-        conteo_hora['acumulado'] = conteo_hora['cantidad'].cumsum()
+    pivot_df.plot(kind='bar', ax=ax1, color=['#FFD700', '#FF8C00', '#4A55A2'], edgecolor='black', width=0.7)
+    ax1.set_title('Aforo por Día y Bloque Horario')
+    ax1.set_xlabel('Día de la Semana')
+    ax1.set_ylabel('Total Personas')
+    ax1.set_xticklabels(orden_dias, rotation=45)
+    ax1.grid(axis='y', linestyle='--', alpha=0.7)
+    ax1.legend(title='Bloque')
+    for p in ax1.patches:
+        if p.get_height() > 0:
+            ax1.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom')
+
+    # ==========================================
+    # GRÁFICO 2 (Arriba Der): Pastel por Bloque Horario
+    # ==========================================
+    ax2 = axes[0, 1]
+    conteo_bloques = df.groupby('bloque_horario').size().reindex(orden_bloques, fill_value=0)
+    conteo_bloques = conteo_bloques[conteo_bloques > 0]
+    
+    if not conteo_bloques.empty:
+        ax2.pie(conteo_bloques, labels=conteo_bloques.index, autopct='%1.1f%%', 
+                colors=['#FFD700', '#FF8C00', '#4A55A2'], startangle=90, textprops={'fontsize': 12})
+    ax2.set_title('Distribución Porcentual por Bloque')
+
+    # ==========================================
+    # GRÁFICO 3 (Abajo Izq): Barras por Hora
+    # ==========================================
+    ax3 = axes[1, 0]
+    conteo_horas = df.groupby('hora_hh').size().reset_index(name='total')
+    ax3.bar(conteo_horas['hora_hh'], conteo_horas['total'], color='#3498DB', edgecolor='black', alpha=0.8)
+    ax3.set_title('Aforo Total por Hora del Día')
+    ax3.set_xlabel('Hora (HH:00)')
+    ax3.set_ylabel('Total Personas')
+    ax3.grid(axis='y', linestyle='--', alpha=0.7)
+    for p in ax3.patches:
+        if p.get_height() > 0:
+            ax3.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom')
+
+    # ==========================================
+    # GRÁFICO 4 (Abajo Der): Línea Acumulada CON DESPLAZAMIENTO (JITTER)
+    # ==========================================
+    ax4 = axes[1, 1]
+    colores_lineas = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    estilos_linea = ['-', '--', '-.', ':']
+    marcadores = ['o', 's', '^', 'D']
+    
+    # Obtener todas las horas únicas ordenadas
+    horas_unicas = sorted(df['hora'].unique())
+    hora_a_idx = {h: i for i, h in enumerate(horas_unicas)} # Mapear hora a un índice numérico
+    
+    fechas_unicas = df['fecha'].unique()
+    num_dias = len(fechas_unicas)
+    
+    for i, fecha in enumerate(fechas_unicas):
+        df_dia = df[df['fecha'] == fecha].copy()
+        df_dia['acumulado'] = range(1, len(df_dia) + 1)
         
         nombre_dia = df_dia['dia'].iloc[0]
-        color = colores[i % len(colores)]
+        color = colores_lineas[i % len(colores_lineas)]
+        estilo = estilos_linea[i % len(estilos_linea)]
+        marcador = marcadores[i % len(marcadores)]
         
-        # drawstyle='steps-post' crea el efecto de escalón
-        ax2.plot(conteo_hora['hora'], conteo_hora['acumulado'], marker='o', 
-                 label=f"{nombre_dia} ({fecha})", color=color, linewidth=2, drawstyle='steps-post')
+        # Calcular desplazamiento (Jitter): si hay 3 días, los offsets serán -0.15, 0, +0.15
+        offset = (i - (num_dias - 1) / 2) * 0.15
+        
+        # Crear posiciones X desplazadas
+        x_pos = [hora_a_idx[h] + offset for h in df_dia['hora']]
+        
+        # Graficar con estilos distintos y el eje X desplazado
+        ax4.plot(x_pos, df_dia['acumulado'], marker=marcador, linestyle=estilo,
+                 label=f"{nombre_dia}", color=color, linewidth=2.5, markersize=8, drawstyle='steps-post')
+        
+        # Rellenar debajo de la línea
+        ax4.fill_between(x_pos, df_dia['acumulado'], alpha=0.05, color=color, step='post')
+        
+        # Poner los números sobre cada punto
+        for x, y in zip(x_pos, df_dia['acumulado']):
+            ax4.text(x, y + 0.15, str(y), ha='center', va='bottom', fontweight='bold', color=color)
 
-    ax2.set_title('Tendencia de Aforo Acumulado por Hora')
-    ax2.set_xlabel('Hora del día (HH:MM)')
-    ax2.set_ylabel('Personas Acumuladas')
-    ax2.legend()
-    ax2.grid(True, linestyle='--', alpha=0.7)
+    # Configurar el eje X para que muestre las horas en lugar de números
+    ax4.set_xticks(range(len(horas_unicas)))
+    ax4.set_xticklabels(horas_unicas, rotation=45)
+    
+    ax4.set_title('Tendencia Acumulada por Hora (con desplazamiento)')
+    ax4.set_xlabel('Hora del día')
+    ax4.set_ylabel('Personas Acumuladas')
+    ax4.legend(loc='upper left')
+    ax4.grid(True, linestyle='--', alpha=0.7)
 
     plt.tight_layout()
     ruta_salida = 'data/dashboard_aforo.png'
     plt.savefig(ruta_salida, dpi=150)
-    print(f"[INFO] Dashboard guardado exitosamente en: {ruta_salida}")
+    print(f"[INFO] Dashboard con Jitter guardado en: {ruta_salida}")
 
 if __name__ == "__main__":
     generar_dashboard()

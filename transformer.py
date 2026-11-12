@@ -2,7 +2,7 @@
 transformer.py
 --------------
 Transforma los datos crudos en un dataset limpio.
-Incluye un reporte de calidad de datos (Data Quality Report).
+Clasifica en bloques: Mañana, Tarde y Noche.
 """
 import glob
 import pandas as pd
@@ -24,16 +24,13 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     print("[FASE 4] Iniciando limpieza de datos...")
     registros_iniciales = len(df)
     
-    # 1. Eliminar valores nulos en columnas clave
     df = df.dropna(subset=['fecha', 'hora', 'clase_objeto'])
     nulos_eliminados = registros_iniciales - len(df)
     
-    # 2. Solo conservar personas y renombrar
     df = df[df['clase_objeto'] == 'person'].copy()
     df['clase_objeto'] = 'persona'
     no_personas_eliminadas = registros_iniciales - nulos_eliminados - len(df)
     
-    # 3. Eliminar duplicados exactos (misma fecha, hora, persona)
     df = df.drop_duplicates(subset=['fecha', 'hora', 'clase_objeto'])
     duplicados_eliminados = (registros_iniciales - nulos_eliminados - no_personas_eliminadas) - len(df)
     
@@ -46,16 +43,23 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def enrich_time_block(df: pd.DataFrame) -> pd.DataFrame:
-    print("[FASE 4] Enriqueciendo datos (Bloques horarios)...")
+    print("[FASE 4] Enriqueciendo datos (Mañana, Tarde, Noche)...")
     def obtener_bloque(hora_str):
         try:
-            # Asumimos formato HH:MM
             h = datetime.strptime(hora_str, "%H:%M").time()
+            
             manana_inicio = datetime.strptime(config.MORNING_RANGE[0], "%H:%M:%S").time()
             manana_fin = datetime.strptime(config.MORNING_RANGE[1], "%H:%M:%S").time()
+            
+            tarde_inicio = datetime.strptime(config.AFTERNOON_RANGE[0], "%H:%M:%S").time()
+            tarde_fin = datetime.strptime(config.AFTERNOON_RANGE[1], "%H:%M:%S").time()
+            
             if manana_inicio <= h <= manana_fin:
                 return "Mañana"
-            return "Vespertina"
+            elif tarde_inicio <= h <= tarde_fin:
+                return "Tarde"
+            else:
+                return "Noche"
         except:
             return "Desconocido"
     
@@ -67,7 +71,6 @@ def transform() -> pd.DataFrame:
     df = clean_data(df)
     df = enrich_time_block(df)
     
-    # Renombrar dia_semana a dia para mantener compatibilidad
     if 'dia_semana' in df.columns:
         df = df.rename(columns={'dia_semana': 'dia'})
         

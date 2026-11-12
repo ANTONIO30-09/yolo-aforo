@@ -15,11 +15,14 @@ SHOW_VIDEO_WINDOW = True
 
 CLEAN_DATASET_PATH = OUTPUT_DIR / "dataset_limpio.csv"
 CLASSES_TO_KEEP = {"person": "persona"}
-MORNING_RANGE = ("06:00:00", "13:59:59")
-AFTERNOON_RANGE = ("14:00:00", "21:59:59")
+
+# Nuevos rangos de jornada (Mañana, Tarde y Noche)
+MORNING_RANGE = ("06:00:00", "11:59:59")
+AFTERNOON_RANGE = ("12:00:00", "18:59:59")
+NIGHT_RANGE = ("19:00:00", "05:59:59")
+
 CLEAN_CSV_COLUMNS = ["fecha", "dia", "hora", "clase_objeto", "bloque_horario"]
 
-# Diccionario para traducir las clases de YOLO al español
 CLASS_TRANSLATIONS = {
     "person": "persona",
     "dog": "perro",
