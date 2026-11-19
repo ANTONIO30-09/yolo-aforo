@@ -3,6 +3,7 @@ transformer.py
 --------------
 Transforma los datos crudos en un dataset limpio.
 Clasifica en bloques: Mañana, Tarde y Noche.
+FIX: Acepta 'person' y 'persona' (compatibilidad con datos legacy y nuevos).
 """
 import glob
 import pandas as pd
@@ -24,13 +25,21 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     print("[FASE 4] Iniciando limpieza de datos...")
     registros_iniciales = len(df)
     
+    # DIAGNÓSTICO: Mostrar qué clases hay realmente en el dataset
+    if 'clase_objeto' in df.columns:
+        clases_unicas = df['clase_objeto'].unique()
+        print(f" -> Clases detectadas en el dataset: {list(clases_unicas)}")
+    
+    # 1. Eliminar nulos
     df = df.dropna(subset=['fecha', 'hora', 'clase_objeto'])
     nulos_eliminados = registros_iniciales - len(df)
     
-    df = df[df['clase_objeto'] == 'person'].copy()
+    # 2. FIX: Aceptar 'person' y 'persona' para compatibilidad
+    df = df[df['clase_objeto'].isin(['person', 'persona'])].copy()
     df['clase_objeto'] = 'persona'
     no_personas_eliminadas = registros_iniciales - nulos_eliminados - len(df)
     
+    # 3. Eliminar duplicados exactos
     df = df.drop_duplicates(subset=['fecha', 'hora', 'clase_objeto'])
     duplicados_eliminados = (registros_iniciales - nulos_eliminados - no_personas_eliminadas) - len(df)
     
@@ -40,6 +49,10 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     print(f" -> Registros duplicados eliminados: {duplicados_eliminados}")
     print(f" -> Total de registros limpios conservados: {len(df)}")
     
+    if len(df) == 0:
+        print(" [ALERTA ROJA] El dataset quedó vacío después de la limpieza.")
+        print(" [ALERTA ROJA] Revisa el diagnóstico de clases de arriba.")
+    
     return df
 
 def enrich_time_block(df: pd.DataFrame) -> pd.DataFrame:
@@ -47,10 +60,8 @@ def enrich_time_block(df: pd.DataFrame) -> pd.DataFrame:
     def obtener_bloque(hora_str):
         try:
             h = datetime.strptime(hora_str, "%H:%M").time()
-            
             manana_inicio = datetime.strptime(config.MORNING_RANGE[0], "%H:%M:%S").time()
             manana_fin = datetime.strptime(config.MORNING_RANGE[1], "%H:%M:%S").time()
-            
             tarde_inicio = datetime.strptime(config.AFTERNOON_RANGE[0], "%H:%M:%S").time()
             tarde_fin = datetime.strptime(config.AFTERNOON_RANGE[1], "%H:%M:%S").time()
             
